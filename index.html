@@ -1,0 +1,193 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Galaxy Explorers</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#05091d;color:white;font-family:Arial;text-align:center}
+header{padding:16px;color:#80eaff;font-weight:bold;letter-spacing:3px;font-size:21px}
+.stats{display:flex;justify-content:space-around;padding:8px}
+.stats div{background:#142347;padding:10px;border-radius:10px;font-size:13px}
+canvas{width:100%;max-width:480px;display:block;margin:auto;touch-action:none;border-radius:12px}
+.controls{display:flex;justify-content:center;gap:8px;padding:12px}
+button{background:#173a70;color:white;border:1px solid #55a5db;padding:14px;border-radius:12px;font-weight:bold}
+#message{color:#9cdfff;font-size:13px;padding:8px}
+</style>
+</head>
+<body>
+<header>🪐 GALAXY EXPLORERS</header>
+<div class="stats">
+<div>💎 CRYSTALS: <span id="score">0</span></div>
+<div>📏 DISTANCE: <span id="distance">0</span></div>
+<div>⚡ ENERGY: <span id="energy">100</span>%</div>
+</div>
+<canvas id="game" width="480" height="600"></canvas>
+<div class="controls">
+<button id="left">◀ LEFT</button>
+<button id="boost">⚡ BOOST</button>
+<button id="right">RIGHT ▶</button>
+</div>
+<button id="start">🚀 START / RESUME</button>
+<button id="reset">↻ RESTART</button>
+<p id="message">Collect crystals. Avoid asteroids. Explore space!</p>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const $=id=>document.getElementById(id);
+let ship=0,score=0,distance=0,energy=100;
+let running=false,boost=false,frame=0,objects=[];
+let stars=Array.from({length:110},()=>({
+ x:Math.random()*480,y:Math.random()*600,
+ speed:.3+Math.random()*1.5
+}));
+let keys={left:false,right:false};
+
+function reset(){
+ ship=0;score=0;distance=0;energy=100;
+ frame=0;objects=[];running=false;boost=false;
+ $("message").textContent="New journey started!";
+ update();
+}
+function update(){
+ $("score").textContent=score;
+ $("distance").textContent=Math.floor(distance);
+ $("energy").textContent=Math.floor(energy);
+}
+function circle(x,y,r,color){
+ ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+ ctx.fillStyle=color;ctx.fill();
+}
+function planet(x,y,r,c1,c2){
+ let g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.05,x,y,r);
+ g.addColorStop(0,c1);g.addColorStop(1,c2);
+ circle(x,y,r,g);
+ ctx.strokeStyle="rgba(180,210,255,.4)";
+ ctx.lineWidth=4;
+ ctx.beginPath();
+ ctx.ellipse(x,y,r*1.5,r*.35,-.3,0,Math.PI*2);
+ ctx.stroke();
+}
+function spawn(){
+ objects.push({
+ type:Math.random()<.65?"crystal":"rock",
+ x:40+Math.random()*400,y:-30,
+ r:Math.random()<.65?11:18,spin:0
+ });
+}
+function drawShip(){
+ ctx.save();
+ ctx.translate(240+ship,495);
+ ctx.shadowBlur=18;ctx.shadowColor="#36dfff";
+ ctx.fillStyle="#ff9d46";
+ ctx.beginPath();
+ ctx.moveTo(-9,24);ctx.lineTo(0,boost?65:43);
+ ctx.lineTo(9,24);ctx.fill();
+ ctx.fillStyle="#d4f0ff";
+ ctx.beginPath();
+ ctx.moveTo(0,-29);ctx.lineTo(22,23);
+ ctx.lineTo(0,15);ctx.lineTo(-22,23);
+ ctx.closePath();ctx.fill();
+ ctx.fillStyle="#159bc7";
+ ctx.beginPath();ctx.ellipse(0,-6,7,12,0,0,7);ctx.fill();
+ ctx.restore();
+}
+function draw(){
+ ctx.fillStyle="#050a22";ctx.fillRect(0,0,480,600);
+ let bg=ctx.createLinearGradient(0,0,0,600);
+ bg.addColorStop(0,"#050a22");bg.addColorStop(1,"#111b3a");
+ ctx.fillStyle=bg;ctx.fillRect(0,0,480,600);
+
+ stars.forEach(s=>{
+ s.y+=running?(boost?5:2):.35;
+ if(s.y>600)s.y=0;
+ circle(s.x,s.y,1.2,"rgba(210,230,255,.8)");
+ });
+
+ planet(365,130,68,"#a6baff","#35439c");
+ planet(65,300,31,"#ffcc9a","#9e3e58");
+
+ if(running){
+ frame++;distance+=boost?1.7:.55;
+ if(frame%48===0)spawn();
+ if(boost)energy=Math.max(0,energy-.35);
+ else energy=Math.min(100,energy+.09);
+ if(energy<=0)boost=false;
+
+ objects.forEach(o=>{
+ o.y+=boost?5.1:2.7;o.spin+=.06;
+ });
+ for(let i=objects.length-1;i>=0;i--){
+ let o=objects[i];
+ if(o.type==="crystal"){
+ ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.spin);
+ ctx.shadowBlur=18;ctx.shadowColor="#24f5ff";
+ ctx.fillStyle="#39f5ff";
+ ctx.beginPath();ctx.moveTo(0,-o.r);
+ ctx.lineTo(o.r*.7,0);ctx.lineTo(0,o.r);
+ ctx.lineTo(-o.r*.7,0);ctx.fill();ctx.restore();
+ }else{
+ circle(o.x,o.y,o.r,"#68758c");
+ circle(o.x-5,o.y-4,5,"#a4b0c1");
+ }
+ if(Math.abs(o.x-(240+ship))<o.r+17 &&
+ Math.abs(o.y-495)<o.r+22){
+ if(o.type==="crystal"){
+ score++;
+ $("message").textContent="Crystal collected! Great flying!";
+ }else{
+ energy=Math.max(0,energy-12);
+ $("message").textContent="Asteroid impact! Watch your energy!";
+ }
+ objects.splice(i,1);continue;
+ }
+ if(o.y>630)objects.splice(i,1);
+ }
+ if(energy<=0){
+ running=false;
+ $("message").textContent="Energy depleted! Restart your adventure.";
+ }
+ }
+ drawShip();
+ update();
+ requestAnimationFrame(draw);
+}
+function move(x){ship=Math.max(-190,Math.min(190,ship+x))}
+function hold(id,key){
+ let b=$(id);
+ b.onpointerdown=e=>{e.preventDefault();keys[key]=true};
+ ["pointerup","pointercancel","pointerleave"].forEach(ev=>
+ b.addEventListener(ev,()=>keys[key]=false));
+}
+hold("left","left");hold("right","right");
+$("left").onclick=()=>move(-20);
+$("right").onclick=()=>move(20);
+$("boost").onpointerdown=()=>boost=true;
+["pointerup","pointercancel","pointerleave"].forEach(ev=>
+ $("boost").addEventListener(ev,()=>boost=false));
+
+let dragging=false;
+canvas.onpointerdown=e=>{dragging=true;canvas.setPointerCapture(e.pointerId);steer(e)};
+canvas.onpointermove=e=>{if(dragging)steer(e)};
+canvas.onpointerup=()=>dragging=false;
+canvas.onpointercancel=()=>dragging=false;
+function steer(e){
+ let r=canvas.getBoundingClientRect();
+ let x=(e.clientX-r.left)/r.width*480;
+ ship=Math.max(-190,Math.min(190,x-240));
+}
+$("start").onclick=()=>{
+ if(energy>0){
+ running=true;
+ $("message").textContent="Explore the galaxy and collect crystals!";
+ }
+};
+$("reset").onclick=reset;
+
+draw();
+</script>
+</body>
+</html>
